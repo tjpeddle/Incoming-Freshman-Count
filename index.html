@@ -257,7 +257,7 @@ function ingest(raw){
   }
   const seen = new Set();
   const rows = [];
-  let dupes = 0;
+  let dupes = 0, skipped = 0;
   for(let i=1;i<raw.length;i++){
     const r = raw[i]; if(!r) continue;
     const name = String(r[idx.name]??"").trim();
@@ -265,6 +265,9 @@ function ingest(raw){
     const cls = idx.class>-1 ? String(r[idx.class]??"").trim() : "";
     const status = idx.status>-1 ? String(r[idx.status]??"").trim() : "";
     const accom = idx.accom>-1 ? String(r[idx.accom]??"").trim() : "";
+    // Only keep rows that have BOTH an accommodation (column D) and a
+    // decision in column C. Name-only and undecided rows are skipped.
+    if(!accom || !status){ skipped++; continue; }
     const sig = name+"||"+status+"||"+accom+"||"+cls;
     if(seen.has(sig)){ dupes++; continue; }
     seen.add(sig);
@@ -272,6 +275,7 @@ function ingest(raw){
   }
   STATE.rows = rows;
   STATE.dupes = dupes;
+  STATE.skipped = skipped;
   STATE.classLevels = [...new Set(rows.map(r=>r.cls).filter(Boolean))].sort();
   STATE.activeClass = "__all__";
   document.getElementById('empty').hidden = true;
@@ -326,9 +330,8 @@ function render(){
 function renderCards(d){
   const rate = d.decided ? Math.round(d.approved/d.decided*100) : 0;
   const cards = [
-    {label:"Unique students", value:d.totalStudents.toLocaleString(), sub:"in this view", cls:""},
-    {label:"With accommodations", value:d.withAccom.toLocaleString(), sub:`${d.noAccom.toLocaleString()} roster-only`, cls:"accent"},
-    {label:"Total requests", value:d.requests.toLocaleString(), sub:"after de-duplication", cls:""},
+    {label:"Students", value:d.withAccom.toLocaleString(), sub:"with an accommodation", cls:"accent"},
+    {label:"Total requests", value:d.requests.toLocaleString(), sub:`${d.accom.length} distinct types`, cls:""},
     {label:"Approved", value:d.approved.toLocaleString(), sub:`${rate}% of decided`, cls:"good"},
     {label:"Denied", value:d.denied.toLocaleString(), sub:d.pending?`${d.pending} undecided`:"all decided", cls:"bad"},
   ];
@@ -381,9 +384,10 @@ function renderAccom(d){
 
 function renderFootnote(d){
   document.getElementById('footnote').innerHTML =
-    `<strong>${STATE.filename||'Sample data'}</strong> — ${STATE.rows.length.toLocaleString()} rows loaded`
+    `<strong>${STATE.filename||'Sample data'}</strong> — ${STATE.rows.length.toLocaleString()} accommodation rows loaded`
+    + (STATE.skipped?`, ${STATE.skipped.toLocaleString()} name-only rows skipped`:``)
     + (STATE.dupes?`, ${STATE.dupes} duplicate rows removed`:``)
-    + `. Counts reflect de-duplicated <em>name + status + accommodation</em> records. `
+    + `. Only rows with an entry in the Requested Accommodation column are counted. `
     + `Data is processed entirely in your browser and is never uploaded or stored — safe to keep this page on GitHub Pages without committing any student data.`;
 }
 
