@@ -272,6 +272,33 @@ function filteredRows(){
   );
 }
 
+/* Rows for student-outcome stats: every filter EXCEPT decision, so
+   "got something vs. nothing" always compares across both outcomes. */
+function rowsForOutcomes(){
+  const f = STATE.filters;
+  return STATE.rows.filter(r=>
+    (f.term==="__all__" || r.term===f.term) &&
+    (f.cls==="__all__" || r.cls===f.cls) &&
+    (f.accom==="__all__" || r.accom===f.accom)
+  );
+}
+function studentOutcomes(rows){
+  const m = new Map();
+  for(const r of rows){
+    const sm = m.get(r.name) || {a:0,d:0};
+    const s = r.status.toLowerCase();
+    if(s==='approved') sm.a++; else if(s==='denied') sm.d++;
+    m.set(r.name, sm);
+  }
+  let fa=0, pa=0, fd=0;
+  for(const [,sm] of m){
+    if(sm.a>0 && sm.d===0) fa++;
+    else if(sm.a>0 && sm.d>0) pa++;
+    else fd++;
+  }
+  return { students:m.size, gotApproval:fa+pa, gotNothing:fd, fullyApproved:fa, partial:pa, fullyDenied:fd };
+}
+
 function aggregate(rows){
   const students=new Set(), accom=new Map();
   let approved=0, denied=0;
@@ -325,16 +352,19 @@ function optList(arr, allLabel){
 function render(){
   const rows = filteredRows();
   const d = aggregate(rows);
-  renderCards(d);
+  const oc = studentOutcomes(rowsForOutcomes());
+  renderCards(d, oc);
   renderAccom(d);
   refreshStudent();
   renderFootnote(d);
   const sb = document.getElementById('f_accom'); if(sb) sb.value = STATE.filters.accom;
 }
-function renderCards(d){
+function renderCards(d, oc){
   const rate = d.decided ? Math.round(d.approved/d.decided*100) : 0;
+  const ocRate = oc.students ? Math.round(oc.gotApproval/oc.students*100) : 0;
   const cards = [
-    {label:"Students", value:d.students.toLocaleString(), sub:"in this view", cls:"accent"},
+    {label:"Students", value:oc.students.toLocaleString(), sub:"in this view", cls:"accent"},
+    {label:"Got \u22651 approval", value:oc.gotApproval.toLocaleString(), sub:`${ocRate}% \u00b7 ${oc.gotNothing.toLocaleString()} got nothing`, cls:"good"},
     {label:"Requests", value:d.requests.toLocaleString(), sub:`${d.accom.length} accommodation types`, cls:""},
     {label:"Approved", value:d.approved.toLocaleString(), sub:`${rate}% of decided`, cls:"good"},
     {label:"Denied", value:d.denied.toLocaleString(), sub:`${100-rate}% of decided`, cls:"bad"},
@@ -431,22 +461,29 @@ function exportWord(){
     a.name.localeCompare(b.name) || (a.term||'').localeCompare(b.term||'') || a.accom.localeCompare(b.accom));
   if(!rows.length){ alert("No records match the current filters."); return; }
   const d = aggregate(rows);
+  const oc = studentOutcomes(rowsForOutcomes());
   const today = new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+  const pct = (n,t)=> t ? Math.round(n/t*100)+'%' : '0%';
+  const reqRate = d.decided ? Math.round(d.approved/d.decided*100) : 0;
 
-  let body='', lastName=null, lastTerm=null;
+  // student detail table (grouped — name shown once per student)
+  let detail='', lastName=null, lastTerm=null;
   for(const r of rows){
     const same = r.name===lastName;
     const nameCell = same ? '' : escapeHtml(r.name);
-    const termCell = (same && r.term===lastTerm) ? '' : escapeHtml(r.term||'—');
+    const termCell = (same && r.term===lastTerm) ? '' : escapeHtml(r.term||'\u2014');
     const color = r.status.toLowerCase()==='approved' ? '#1E7E45' : '#B3243C';
-    const topBorder = same ? '' : 'border-top:1.5px solid #46157D;';
-    body += `<tr>
-      <td style="${topBorder}font-weight:bold;">${nameCell}</td>
-      <td style="${topBorder}">${termCell}</td>
-      <td style="${topBorder}">${escapeHtml(r.accom)}</td>
-      <td style="${topBorder}color:${color};font-weight:bold;">${escapeHtml(r.status)}</td></tr>`;
+    const top = same ? '' : 'border-top:1.5px solid #46157D;';
+    detail += `<tr><td style="${top}font-weight:bold;">${nameCell}</td><td style="${top}">${termCell}</td><td style="${top}">${escapeHtml(r.accom)}</td><td style="${top}color:${color};font-weight:bold;">${escapeHtml(r.status)}</td></tr>`;
     lastName=r.name; lastTerm=r.term;
   }
+
+  // accommodation breakdown table
+  const acc = d.accom.slice().sort((x,y)=>y.total-x.total || x.name.localeCompare(y.name));
+  let breakdown = acc.map(a=>{
+    const r = a.a+a.d ? Math.round(a.a/(a.a+a.d)*100)+'%' : '\u2014';
+    return `<tr><td>${escapeHtml(a.name)}</td><td style="text-align:center;">${a.total}</td><td style="text-align:center;color:#1E7E45;">${a.a}</td><td style="text-align:center;color:#B3243C;">${a.d}</td><td style="text-align:center;">${r}</td></tr>`;
+  }).join('');
 
   const html =
 `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -456,23 +493,43 @@ function exportWord(){
 @page{size:portrait;margin:0.8in;}
 body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1A1424;}
 h1{font-size:18pt;color:#46157D;margin:0 0 2pt;}
+h2{font-size:13pt;color:#46157D;margin:18pt 0 6pt;border-bottom:1pt solid #E6E2EE;padding-bottom:3pt;}
 .meta{color:#555;font-size:9.5pt;margin:0 0 2pt;}
-.summary{font-size:10pt;margin:8pt 0 12pt;}
-table{border-collapse:collapse;width:100%;}
+table{border-collapse:collapse;width:100%;margin-top:4pt;}
 th,td{border:0.5pt solid #C9C2D6;padding:5pt 8pt;text-align:left;vertical-align:top;font-size:10pt;}
 th{background:#46157D;color:#FFFFFF;font-size:9.5pt;text-transform:uppercase;letter-spacing:.4pt;}
+table.kv td{border:none;padding:2pt 14pt 2pt 0;font-size:10.5pt;}
+table.kv td.n{font-weight:bold;text-align:right;width:60pt;}
+table.kv td.p{color:#555;width:48pt;}
 </style></head><body>
 <h1>OARS Accommodation Report</h1>
 <p class="meta">Office of Accessibility Resources &amp; Services &middot; High Point University</p>
 <p class="meta">Generated ${today} &middot; Source: ${escapeHtml(STATE.filename||'Sample data')}</p>
 <p class="meta"><b>Filters:</b> ${escapeHtml(describeFilters())}</p>
-<p class="summary"><b>${d.students.toLocaleString()}</b> students &middot; <b>${d.requests.toLocaleString()}</b> requests &middot; <b style="color:#1E7E45;">${d.approved.toLocaleString()}</b> approved &middot; <b style="color:#B3243C;">${d.denied.toLocaleString()}</b> denied</p>
+
+<h2>Student outcomes</h2>
+<table class="kv"><tr><td>Students in this view</td><td class="n">${oc.students.toLocaleString()}</td><td class="p"></td></tr>
+<tr><td>Got at least one approval</td><td class="n" style="color:#1E7E45;">${oc.gotApproval.toLocaleString()}</td><td class="p">${pct(oc.gotApproval,oc.students)}</td></tr>
+<tr><td style="padding-left:18pt;color:#555;">&mdash; all requests approved</td><td class="n">${oc.fullyApproved.toLocaleString()}</td><td class="p">${pct(oc.fullyApproved,oc.students)}</td></tr>
+<tr><td style="padding-left:18pt;color:#555;">&mdash; some approved, some denied</td><td class="n">${oc.partial.toLocaleString()}</td><td class="p">${pct(oc.partial,oc.students)}</td></tr>
+<tr><td>Got nothing approved (all denied)</td><td class="n" style="color:#B3243C;">${oc.gotNothing.toLocaleString()}</td><td class="p">${pct(oc.gotNothing,oc.students)}</td></tr></table>
+<p class="meta" style="margin-top:4pt;">Outcomes count every Approved/Denied decision in this semester / class / accommodation view, regardless of the Decision filter.</p>
+
+<h2>Request totals</h2>
+<table class="kv"><tr><td>Total requests</td><td class="n">${d.requests.toLocaleString()}</td><td class="p"></td></tr>
+<tr><td>Approved</td><td class="n" style="color:#1E7E45;">${d.approved.toLocaleString()}</td><td class="p">${pct(d.approved,d.decided)}</td></tr>
+<tr><td>Denied</td><td class="n" style="color:#B3243C;">${d.denied.toLocaleString()}</td><td class="p">${100-reqRate}%</td></tr></table>
+
+<h2>Accommodation breakdown</h2>
+<table><thead><tr><th>Requested Accommodation</th><th style="text-align:center;">Total</th><th style="text-align:center;">Approved</th><th style="text-align:center;">Denied</th><th style="text-align:center;">Approval&nbsp;%</th></tr></thead>
+<tbody>${breakdown}</tbody></table>
+
+<h2>Student detail</h2>
 <table><thead><tr><th>Student</th><th>Semester</th><th>Requested Accommodation</th><th>Decision</th></tr></thead>
-<tbody>${body}</tbody></table>
+<tbody>${detail}</tbody></table>
 </body></html>`;
 
-  const blob = new Blob(['\ufeff', html], {type:'application/msword'});
-  triggerDownload(blob, `OARS-Accommodation-Report-${stamp()}.doc`);
+  triggerDownload(new Blob(['\ufeff', html], {type:'application/msword'}), `OARS-Accommodation-Report-${stamp()}.doc`);
 }
 
 /* ---------- CSV export ---------- */
