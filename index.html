@@ -10,94 +10,62 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
-    --bg:#F5F4F8;
-    --surface:#FFFFFF;
-    --ink:#1A1424;
-    --muted:#6B6478;
-    --line:#E6E2EE;
-    --purple:#46157D;      /* HPU-leaning deep purple */
-    --purple-bright:#7B3FE4;
-    --purple-soft:#F1ECFA;
-    --approved:#1E9E5A;
-    --denied:#D6435B;
-    --pending:#B9B2C6;
-    --shadow:0 1px 2px rgba(26,20,36,.04), 0 8px 24px rgba(26,20,36,.05);
-    --radius:14px;
+    --bg:#F5F4F8; --surface:#FFFFFF; --ink:#1A1424; --muted:#6B6478; --line:#E6E2EE;
+    --purple:#46157D; --purple-bright:#7B3FE4; --purple-soft:#F1ECFA;
+    --approved:#1E9E5A; --denied:#D6435B;
+    --shadow:0 1px 2px rgba(26,20,36,.04), 0 8px 24px rgba(26,20,36,.05); --radius:14px;
   }
   *{box-sizing:border-box;}
-  html{-webkit-text-size-adjust:100%;}
-  body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font-family:"Inter",system-ui,-apple-system,sans-serif;
-    font-feature-settings:"tnum" 1,"cv05" 1;
-    line-height:1.5;
-  }
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:"Inter",system-ui,sans-serif; font-feature-settings:"tnum" 1; line-height:1.5;}
   .wrap{max-width:1080px; margin:0 auto; padding:28px 22px 64px;}
 
-  /* Header */
-  header.app{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:22px;}
+  header.app{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px;}
   .brand{display:flex; align-items:center; gap:14px;}
-  .brand .mark{
-    width:46px; height:46px; border-radius:12px; flex:0 0 auto;
-    background:linear-gradient(150deg,var(--purple),var(--purple-bright));
-    display:grid; place-items:center; color:#fff; font-family:"Space Grotesk"; font-weight:700; font-size:20px;
-    box-shadow:0 6px 16px rgba(70,21,125,.28);
-  }
+  .brand .mark{width:46px; height:46px; border-radius:12px; flex:0 0 auto; background:linear-gradient(150deg,var(--purple),var(--purple-bright)); display:grid; place-items:center; color:#fff; font-family:"Space Grotesk"; font-weight:700; font-size:20px; box-shadow:0 6px 16px rgba(70,21,125,.28);}
   .brand h1{font-family:"Space Grotesk"; font-weight:700; font-size:1.4rem; margin:0; letter-spacing:-.01em;}
   .brand p{margin:2px 0 0; color:var(--muted); font-size:.86rem;}
-
   .controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
-  .btn{
-    font-family:"Inter"; font-weight:600; font-size:.86rem; cursor:pointer;
-    border-radius:10px; padding:9px 15px; border:1px solid var(--line);
-    background:var(--surface); color:var(--ink); transition:.15s;
-  }
+  .btn{font-family:"Inter"; font-weight:600; font-size:.86rem; cursor:pointer; border-radius:10px; padding:9px 15px; border:1px solid var(--line); background:var(--surface); color:var(--ink); transition:.15s;}
   .btn:hover{border-color:var(--purple-bright); color:var(--purple);}
   .btn.primary{background:var(--purple); color:#fff; border-color:var(--purple);}
   .btn.primary:hover{background:var(--purple-bright); color:#fff;}
   .btn:focus-visible, input:focus-visible, select:focus-visible{outline:3px solid var(--purple-bright); outline-offset:2px;}
   input[type=file]{display:none;}
-  .filename{font-size:.8rem; color:var(--muted); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .filename{font-size:.8rem; color:var(--muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
-  /* Empty state / dropzone */
-  .drop{
-    background:var(--surface); border:2px dashed var(--line); border-radius:var(--radius);
-    padding:48px 28px; text-align:center; transition:.18s;
-  }
+  .drop{background:var(--surface); border:2px dashed var(--line); border-radius:var(--radius); padding:48px 28px; text-align:center; transition:.18s;}
   .drop.over{border-color:var(--purple-bright); background:var(--purple-soft);}
   .drop h2{font-family:"Space Grotesk"; font-size:1.2rem; margin:6px 0 8px;}
-  .drop p{color:var(--muted); margin:0 auto 18px; max-width:440px; font-size:.92rem;}
+  .drop p{color:var(--muted); margin:0 auto 18px; max-width:460px; font-size:.92rem;}
   .drop .cols{margin-top:18px; font-size:.78rem; color:var(--muted);}
   .drop code{background:var(--purple-soft); color:var(--purple); padding:2px 7px; border-radius:6px; font-size:.78rem;}
 
-  /* Stat cards */
-  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:4px 0 24px;}
+  /* filter bar */
+  .filterbar{display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; margin-bottom:16px;}
+  .fgroup{display:flex; flex-direction:column; gap:4px;}
+  .fgroup label{font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:600;}
+  .fgroup select{font-family:"Inter"; font-size:.85rem; padding:8px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); min-width:140px;}
+  .filterbar .spacer{flex:1;}
+  .filterbar .btn.clear{align-self:flex-end;}
+
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:0 0 20px;}
   .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow);}
   .card .label{font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600;}
   .card .value{font-family:"Space Grotesk"; font-weight:700; font-size:2rem; line-height:1.1; margin-top:6px; letter-spacing:-.02em;}
   .card .sub{font-size:.78rem; color:var(--muted); margin-top:3px;}
-  .card.accent .value{color:var(--purple);}
-  .card.good .value{color:var(--approved);}
-  .card.bad .value{color:var(--denied);}
+  .card.accent .value{color:var(--purple);} .card.good .value{color:var(--approved);} .card.bad .value{color:var(--denied);}
 
-  /* Section */
   section.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:20px; overflow:hidden;}
   .panel-head{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:18px 20px 14px;}
   .panel-head h2{font-family:"Space Grotesk"; font-size:1.05rem; margin:0;}
   .panel-tools{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
-  .field{position:relative;}
-  .field input, .field select{
-    font-family:"Inter"; font-size:.84rem; padding:8px 12px; border:1px solid var(--line);
-    border-radius:9px; background:var(--surface); color:var(--ink); min-width:120px;
-  }
+  .field input, .field select{font-family:"Inter"; font-size:.84rem; padding:8px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink);}
   .field input{min-width:180px;}
-
   .legend{display:flex; gap:16px; padding:0 20px 12px; font-size:.78rem; color:var(--muted); flex-wrap:wrap;}
   .legend span{display:inline-flex; align-items:center; gap:6px;}
   .swatch{width:11px; height:11px; border-radius:3px; display:inline-block;}
-  .sw-a{background:var(--approved);} .sw-d{background:var(--denied);} .sw-p{background:var(--pending);}
+  .sw-a{background:var(--approved);} .sw-d{background:var(--denied);}
 
-  /* Accommodation rows */
   .rows{padding:4px 8px 12px;}
   .arow{display:grid; grid-template-columns:1fr 78px; gap:14px; align-items:center; padding:10px 12px; border-radius:10px;}
   .arow:hover{background:var(--purple-soft);}
@@ -105,31 +73,23 @@
   .ameta{font-size:.74rem; color:var(--muted); margin-top:3px;}
   .bar{height:12px; border-radius:6px; background:#EFECF5; overflow:hidden; display:flex; margin-top:7px;}
   .bar i{display:block; height:100%;}
-  .bar .a{background:var(--approved);} .bar .d{background:var(--denied);} .bar .p{background:var(--pending);}
+  .bar .a{background:var(--approved);} .bar .d{background:var(--denied);}
   .acount{text-align:right; font-family:"Space Grotesk"; font-weight:600; font-size:1.05rem;}
   .acount small{display:block; font-family:"Inter"; font-weight:500; font-size:.7rem; color:var(--muted);}
   .empty-msg{padding:30px 20px; text-align:center; color:var(--muted); font-size:.88rem;}
 
-  /* Student lookup */
   .stu-result{padding:6px 20px 18px;}
   .stu-card{border:1px solid var(--line); border-radius:11px; padding:14px 16px; margin-top:10px;}
   .stu-card h3{font-family:"Space Grotesk"; font-size:.98rem; margin:0 0 4px;}
-  .stu-card .none{color:var(--muted); font-size:.85rem;}
   .pill{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; padding:4px 10px; border-radius:20px; margin:4px 6px 0 0; border:1px solid var(--line);}
   .pill.a{background:rgba(30,158,90,.10); border-color:rgba(30,158,90,.3); color:#147a44;}
   .pill.d{background:rgba(214,67,91,.10); border-color:rgba(214,67,91,.3); color:#b32f46;}
-  .pill.p{background:#F2F0F6; color:var(--muted);}
   .matchlist{font-size:.8rem; color:var(--muted); margin-top:8px;}
   .matchlist button{background:none; border:none; color:var(--purple); cursor:pointer; font:inherit; padding:0 6px 0 0; text-decoration:underline;}
 
   footer.app{color:var(--muted); font-size:.76rem; line-height:1.6; margin-top:8px;}
   footer.app strong{color:var(--ink);}
-  .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;}
-
-  @media (max-width:560px){
-    .brand h1{font-size:1.2rem;}
-    .card .value{font-size:1.6rem;}
-  }
+  @media (max-width:560px){ .brand h1{font-size:1.2rem;} .card .value{font-size:1.6rem;} .fgroup select{min-width:120px;} }
   @media (prefers-reduced-motion:reduce){ *{transition:none !important;} }
 </style>
 </head>
@@ -144,7 +104,7 @@
         <p>OARS &middot; High Point University &middot; Accommodate export viewer</p>
       </div>
     </div>
-    <div class="controls" id="topControls">
+    <div class="controls">
       <span class="filename" id="filename" aria-live="polite"></span>
       <button class="btn" id="sampleBtn" type="button">Load sample data</button>
       <button class="btn primary" id="uploadBtn" type="button">Upload export…</button>
@@ -152,19 +112,19 @@
     </div>
   </header>
 
-  <!-- EMPTY STATE -->
   <div id="empty">
     <div class="drop" id="drop">
-      <div class="mark" style="margin:0 auto 4px; width:46px; height:46px; border-radius:12px;background:linear-gradient(150deg,var(--purple),var(--purple-bright));display:grid;place-items:center;color:#fff;font-family:'Space Grotesk';font-weight:700;">↑</div>
+      <div class="mark" style="margin:0 auto 4px;width:46px;height:46px;border-radius:12px;background:linear-gradient(150deg,var(--purple),var(--purple-bright));display:grid;place-items:center;color:#fff;font-family:'Space Grotesk';font-weight:700;">&#8593;</div>
       <h2>Drop your Accommodate export here</h2>
-      <p>Pick the spreadsheet you pulled from Accommodate. Everything runs in your browser — no file leaves this page, and nothing is saved. Use the sample data to preview the layout first.</p>
+      <p>Everything runs in your browser &mdash; no file leaves this page, and nothing is saved. Use the sample data to preview the layout first.</p>
       <button class="btn primary" id="uploadBtn2" type="button">Choose a file</button>
-      <div class="cols">Expected columns: <code>Name</code> &middot; <code>Class Level</code> &middot; <code>Approved</code> &middot; <code>Requested Accommodation</code></div>
+      <div class="cols">Reads columns: <code>Name</code> &middot; <code>Class Level</code> &middot; <code>Approved</code> &middot; <code>Requested Accommodation</code> &middot; <code>Term/Semester</code> (if present)</div>
     </div>
   </div>
 
-  <!-- DASHBOARD -->
   <main id="dash" hidden>
+
+    <div class="filterbar" id="filterbar"></div>
 
     <div class="cards" id="cards"></div>
 
@@ -172,26 +132,21 @@
       <div class="panel-head">
         <h2>Accommodation breakdown</h2>
         <div class="panel-tools">
-          <span class="field"><input type="search" id="accSearch" placeholder="Filter accommodations…" aria-label="Filter accommodations" /></span>
-          <span class="field">
-            <select id="classFilter" aria-label="Class level"></select>
-          </span>
+          <span class="field"><input type="search" id="accSearch" placeholder="Find an accommodation…" aria-label="Find an accommodation" /></span>
           <span class="field">
             <select id="sortBy" aria-label="Sort by">
-              <option value="count">Sort: Most requested</option>
-              <option value="approved">Sort: Most approved</option>
-              <option value="denied">Sort: Most denied</option>
-              <option value="rate">Sort: Lowest approval rate</option>
-              <option value="name">Sort: A–Z</option>
+              <option value="count">Most requested</option>
+              <option value="approved">Most approved</option>
+              <option value="denied">Most denied</option>
+              <option value="rate">Lowest approval rate</option>
+              <option value="name">A&ndash;Z</option>
             </select>
           </span>
-          <button class="btn" id="csvBtn" type="button">Export CSV</button>
         </div>
       </div>
       <div class="legend" aria-hidden="true">
         <span><i class="swatch sw-a"></i> Approved</span>
         <span><i class="swatch sw-d"></i> Denied</span>
-        <span><i class="swatch sw-p"></i> No decision yet</span>
       </div>
       <div class="rows" id="accRows"></div>
     </section>
@@ -213,19 +168,20 @@
 <script>
 "use strict";
 
-const COLS = { name:"name", class:"class level", status:"approved", accom:"requested accommodation" };
-let STATE = { rows:[], classLevels:[], activeClass:"__all__", filename:"" };
+let STATE = {
+  rows:[], terms:[], classLevels:[], accoms:[],
+  filters:{ term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" },
+  filename:"", dupes:0, skipped:0, hasTerm:false
+};
 
 /* ---------- file handling ---------- */
 const fileInput = document.getElementById('fileInput');
 ['uploadBtn','uploadBtn2'].forEach(id=>document.getElementById(id).addEventListener('click',()=>fileInput.click()));
 fileInput.addEventListener('change', e => { if(e.target.files[0]) readFile(e.target.files[0]); });
-
 const drop = document.getElementById('drop');
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
 drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) readFile(f); });
-
 document.getElementById('sampleBtn').addEventListener('click', loadSample);
 
 function readFile(file){
@@ -236,113 +192,156 @@ function readFile(file){
     try{
       const wb = XLSX.read(ev.target.result, {type:'array'});
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, {header:1, blankrows:false});
-      ingest(raw);
-    }catch(err){
-      alert("Could not read that file. Make sure it's the .xlsx/.csv export from Accommodate.\n\n"+err.message);
-    }
+      ingest(XLSX.utils.sheet_to_json(ws, {header:1, blankrows:false}));
+    }catch(err){ alert("Could not read that file. Make sure it's the .xlsx/.csv export from Accommodate.\n\n"+err.message); }
   };
   reader.readAsArrayBuffer(file);
+}
+
+/* ---------- column detection ---------- */
+function findCol(header, exact, partials){
+  let i = header.indexOf(exact);
+  if(i>-1) return i;
+  for(const p of partials){ i = header.findIndex(h=>h.includes(p)); if(i>-1) return i; }
+  return -1;
+}
+function findTermCol(header, raw, used){
+  let i = header.findIndex(h=>h.includes('term')||h.includes('semester'));
+  if(i>-1) return i;
+  // fallback: a column whose values look like "Fall 2026"
+  const seasonYear = /^(fall|spring|summer|winter)\s+\d{4}$/i;
+  const cols = header.length;
+  for(let c=0;c<cols;c++){
+    if(used.includes(c)) continue;
+    let hits=0, checked=0;
+    for(let r=1;r<raw.length && checked<25;r++){
+      const v = raw[r] && raw[r][c]; if(v==null||v==="") continue;
+      checked++; if(seasonYear.test(String(v).trim())) hits++;
+    }
+    if(checked>0 && hits/checked>0.6) return c;
+  }
+  return -1;
 }
 
 /* ---------- parse & dedupe ---------- */
 function ingest(raw){
   if(!raw || !raw.length){ alert("That file looks empty."); return; }
   const header = raw[0].map(h => String(h||"").trim().toLowerCase());
-  const idx = {};
-  for(const key in COLS){ idx[key] = header.indexOf(COLS[key]); }
-  if(idx.name === -1){
-    alert('Could not find a "Name" column. Expected headers: Name, Class Level, Approved, Requested Accommodation.');
-    return;
-  }
-  const seen = new Set();
-  const rows = [];
-  let dupes = 0, skipped = 0;
+  const iName  = findCol(header, "name", ["student name","name"]);
+  const iClass = findCol(header, "class level", ["class"]);
+  const iStat  = findCol(header, "approved", ["status","decision","approved"]);
+  const iAcc   = findCol(header, "requested accommodation", ["accommodation","request"]);
+  const iTerm  = findTermCol(header, raw, [iName,iClass,iStat,iAcc].filter(x=>x>-1));
+  if(iName === -1){ alert('Could not find a "Name" column.'); return; }
+
+  const seen = new Set(); const rows = []; let dupes=0, skipped=0;
   for(let i=1;i<raw.length;i++){
     const r = raw[i]; if(!r) continue;
-    const name = String(r[idx.name]??"").trim();
-    if(!name) continue;
-    const cls = idx.class>-1 ? String(r[idx.class]??"").trim() : "";
-    const status = idx.status>-1 ? String(r[idx.status]??"").trim() : "";
-    const accom = idx.accom>-1 ? String(r[idx.accom]??"").trim() : "";
-    // Only keep rows that have BOTH an accommodation (column D) and a
-    // decision in column C. Name-only and undecided rows are skipped.
+    const name = String(r[iName]??"").trim(); if(!name) continue;
+    const cls  = iClass>-1 ? String(r[iClass]??"").trim() : "";
+    const status = iStat>-1 ? String(r[iStat]??"").trim() : "";
+    const accom = iAcc>-1 ? String(r[iAcc]??"").trim() : "";
+    const term  = iTerm>-1 ? String(r[iTerm]??"").trim() : "";
+    // keep only rows with an accommodation AND a decision
     if(!accom || !status){ skipped++; continue; }
-    const sig = name+"||"+status+"||"+accom+"||"+cls;
+    const sig = [name,status,accom,cls,term].join("||");
     if(seen.has(sig)){ dupes++; continue; }
     seen.add(sig);
-    rows.push({name, cls, status, accom});
+    rows.push({name, cls, status, accom, term});
   }
-  STATE.rows = rows;
-  STATE.dupes = dupes;
-  STATE.skipped = skipped;
+  STATE.rows = rows; STATE.dupes = dupes; STATE.skipped = skipped;
+  STATE.hasTerm = iTerm>-1;
+  STATE.terms = [...new Set(rows.map(r=>r.term).filter(Boolean))].sort().reverse();
   STATE.classLevels = [...new Set(rows.map(r=>r.cls).filter(Boolean))].sort();
-  STATE.activeClass = "__all__";
+  STATE.accoms = [...new Set(rows.map(r=>r.accom))].sort();
+  STATE.filters = { term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" };
   document.getElementById('empty').hidden = true;
   document.getElementById('dash').hidden = false;
-  buildClassFilter();
+  buildFilterBar();
   render();
 }
 
-function activeRows(){
-  if(STATE.activeClass==="__all__") return STATE.rows;
-  return STATE.rows.filter(r=>r.cls===STATE.activeClass);
+/* ---------- filtering ---------- */
+function filteredRows(){
+  const f = STATE.filters;
+  return STATE.rows.filter(r=>
+    (f.term==="__all__" || r.term===f.term) &&
+    (f.cls==="__all__" || r.cls===f.cls) &&
+    (f.decision==="__all__" || r.status.toLowerCase()===f.decision.toLowerCase()) &&
+    (f.accom==="__all__" || r.accom===f.accom)
+  );
 }
 
-/* ---------- aggregate ---------- */
 function aggregate(rows){
-  const students = new Set();
-  const withAccom = new Set();
-  const accom = new Map(); // name -> {a,d,p,total}
-  let approved=0, denied=0, pending=0, requests=0;
+  const students=new Set(), accom=new Map();
+  let approved=0, denied=0;
   for(const r of rows){
     students.add(r.name);
-    if(r.accom){
-      withAccom.add(r.name);
-      requests++;
-      const e = accom.get(r.accom) || {a:0,d:0,p:0,total:0};
-      const s = r.status.toLowerCase();
-      if(s==='approved'){ e.a++; approved++; }
-      else if(s==='denied'){ e.d++; denied++; }
-      else { e.p++; pending++; }
-      e.total++;
-      accom.set(r.accom, e);
-    }
+    const e = accom.get(r.accom) || {a:0,d:0,total:0};
+    const s = r.status.toLowerCase();
+    if(s==='approved'){ e.a++; approved++; } else if(s==='denied'){ e.d++; denied++; }
+    e.total++; accom.set(r.accom, e);
   }
-  return {
-    totalStudents:students.size,
-    withAccom:withAccom.size,
-    noAccom:students.size - withAccom.size,
-    requests, approved, denied, pending,
-    accom:[...accom.entries()].map(([name,v])=>({name,...v})),
-    decided: approved+denied
+  return { students:students.size, requests:rows.length, approved, denied,
+    decided:approved+denied, accom:[...accom.entries()].map(([name,v])=>({name,...v})) };
+}
+
+/* ---------- filter bar ---------- */
+function buildFilterBar(){
+  const bar = document.getElementById('filterbar');
+  const groups = [];
+  if(STATE.hasTerm && STATE.terms.length)
+    groups.push(sel("term","Semester", optList(STATE.terms,"All semesters")));
+  if(STATE.classLevels.length>1)
+    groups.push(sel("cls","Class level", optList(STATE.classLevels,"All class levels")));
+  groups.push(sel("decision","Decision",
+    `<option value="__all__">Approved &amp; denied</option><option value="Approved">Approved only</option><option value="Denied">Denied only</option>`));
+  groups.push(sel("accom","Accommodation", optList(STATE.accoms,"All accommodations")));
+  bar.innerHTML = groups.join('') +
+    `<span class="spacer"></span>` +
+    `<button class="btn clear" id="clearBtn" type="button">Clear filters</button>` +
+    `<button class="btn primary" id="wordBtn" type="button">Export Word doc</button>` +
+    `<button class="btn" id="csvBtn" type="button">CSV</button>`;
+
+  bar.querySelectorAll('select[data-f]').forEach(s=>{
+    s.value = STATE.filters[s.dataset.f];
+    s.addEventListener('change', ()=>{ STATE.filters[s.dataset.f]=s.value; render(); });
+  });
+  document.getElementById('clearBtn').onclick = ()=>{
+    STATE.filters={ term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" };
+    buildFilterBar(); render();
   };
+  document.getElementById('wordBtn').onclick = exportWord;
+  document.getElementById('csvBtn').onclick = exportCSV;
+}
+function sel(key,label,opts){
+  return `<div class="fgroup"><label for="f_${key}">${label}</label><select id="f_${key}" data-f="${key}" aria-label="${label}">${opts}</select></div>`;
+}
+function optList(arr, allLabel){
+  return `<option value="__all__">${allLabel}</option>` + arr.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
 }
 
 /* ---------- render ---------- */
 function render(){
-  const data = aggregate(activeRows());
-  renderCards(data);
-  renderAccom(data);
-  renderFootnote(data);
+  const rows = filteredRows();
+  const d = aggregate(rows);
+  renderCards(d);
+  renderAccom(d);
+  refreshStudent();
+  renderFootnote(d);
+  const sb = document.getElementById('f_accom'); if(sb) sb.value = STATE.filters.accom;
 }
-
 function renderCards(d){
   const rate = d.decided ? Math.round(d.approved/d.decided*100) : 0;
   const cards = [
-    {label:"Students", value:d.withAccom.toLocaleString(), sub:"with an accommodation", cls:"accent"},
-    {label:"Total requests", value:d.requests.toLocaleString(), sub:`${d.accom.length} distinct types`, cls:""},
+    {label:"Students", value:d.students.toLocaleString(), sub:"in this view", cls:"accent"},
+    {label:"Requests", value:d.requests.toLocaleString(), sub:`${d.accom.length} accommodation types`, cls:""},
     {label:"Approved", value:d.approved.toLocaleString(), sub:`${rate}% of decided`, cls:"good"},
-    {label:"Denied", value:d.denied.toLocaleString(), sub:d.pending?`${d.pending} undecided`:"all decided", cls:"bad"},
+    {label:"Denied", value:d.denied.toLocaleString(), sub:`${100-rate}% of decided`, cls:"bad"},
   ];
   document.getElementById('cards').innerHTML = cards.map(c=>`
-    <div class="card ${c.cls}">
-      <div class="label">${c.label}</div>
-      <div class="value">${c.value}</div>
-      <div class="sub">${c.sub}</div>
-    </div>`).join('');
+    <div class="card ${c.cls}"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
 }
-
 function renderAccom(d){
   const q = document.getElementById('accSearch').value.trim().toLowerCase();
   const sortBy = document.getElementById('sortBy').value;
@@ -358,138 +357,174 @@ function renderAccom(d){
   list.sort(sorters[sortBy]);
   const max = list.reduce((m,a)=>Math.max(m,a.total),0) || 1;
   const el = document.getElementById('accRows');
-  if(!list.length){ el.innerHTML = `<p class="empty-msg">No accommodations match “${q}”.</p>`; return; }
+  if(!list.length){ el.innerHTML = `<p class="empty-msg">No accommodations match the current view.</p>`; return; }
   el.innerHTML = list.map(a=>{
-    const w = (a.total/max*100);
+    const w = a.total/max*100;
     const seg = t => a.total ? (t/a.total*100) : 0;
     const r = a.a+a.d ? Math.round(a.a/(a.a+a.d)*100) : null;
     const meta = [`${a.a} approved`, `${a.d} denied`];
-    if(a.p) meta.push(`${a.p} pending`);
     if(r!==null) meta.push(`${r}% approval`);
-    return `
-    <div class="arow">
-      <div>
+    return `<div class="arow"><div>
         <div class="aname">${escapeHtml(a.name)}</div>
         <div class="ameta">${meta.join(' &middot; ')}</div>
-        <div class="bar" style="width:${Math.max(w,6)}%" role="img" aria-label="${a.a} approved, ${a.d} denied${a.p?', '+a.p+' pending':''}">
-          <i class="a" style="width:${seg(a.a)}%"></i>
-          <i class="d" style="width:${seg(a.d)}%"></i>
-          <i class="p" style="width:${seg(a.p)}%"></i>
-        </div>
-      </div>
-      <div class="acount">${a.total}<small>requests</small></div>
-    </div>`;
+        <div class="bar" style="width:${Math.max(w,6)}%" role="img" aria-label="${a.a} approved, ${a.d} denied">
+          <i class="a" style="width:${seg(a.a)}%"></i><i class="d" style="width:${seg(a.d)}%"></i>
+        </div></div>
+      <div class="acount">${a.total}<small>requests</small></div></div>`;
   }).join('');
 }
-
 function renderFootnote(d){
   document.getElementById('footnote').innerHTML =
-    `<strong>${STATE.filename||'Sample data'}</strong> — ${STATE.rows.length.toLocaleString()} accommodation rows loaded`
-    + (STATE.skipped?`, ${STATE.skipped.toLocaleString()} name-only rows skipped`:``)
-    + (STATE.dupes?`, ${STATE.dupes} duplicate rows removed`:``)
-    + `. Only rows with an entry in the Requested Accommodation column are counted. `
-    + `Data is processed entirely in your browser and is never uploaded or stored — safe to keep this page on GitHub Pages without committing any student data.`;
-}
-
-/* ---------- class filter ---------- */
-function buildClassFilter(){
-  const sel = document.getElementById('classFilter');
-  if(STATE.classLevels.length<=1){ sel.style.display='none'; return; }
-  sel.style.display='';
-  sel.innerHTML = `<option value="__all__">All class levels</option>` +
-    STATE.classLevels.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-  sel.onchange = ()=>{ STATE.activeClass = sel.value; render(); };
+    `<strong>${escapeHtml(STATE.filename||'Sample data')}</strong> &mdash; ${STATE.rows.length.toLocaleString()} accommodation rows`
+    + (STATE.skipped?`, ${STATE.skipped.toLocaleString()} name-only/undecided rows skipped`:``)
+    + (STATE.dupes?`, ${STATE.dupes} duplicates removed`:``)
+    + `. Only rows with both an accommodation and an Approved/Denied decision are counted. `
+    + `Showing ${d.requests.toLocaleString()} of ${STATE.rows.length.toLocaleString()} after filters. `
+    + `Processed entirely in your browser &mdash; never uploaded or stored.`;
 }
 
 /* ---------- student lookup ---------- */
-document.getElementById('stuSearch').addEventListener('input', e=>{
-  const q = e.target.value.trim().toLowerCase();
+const stuInput = document.getElementById('stuSearch');
+stuInput.addEventListener('input', refreshStudent);
+function refreshStudent(){
+  const q = stuInput.value.trim().toLowerCase();
   const box = document.getElementById('stuResult');
   if(!q){ box.innerHTML = `<p class="empty-msg" style="padding:18px 12px;">Search a name to see that student's requests and decisions.</p>`; return; }
-  const rows = activeRows();
+  const rows = filteredRows();
   const names = [...new Set(rows.filter(r=>r.name.toLowerCase().includes(q)).map(r=>r.name))].sort();
-  if(!names.length){ box.innerHTML = `<p class="empty-msg" style="padding:18px 12px;">No student matches “${escapeHtml(q)}”.</p>`; return; }
+  if(!names.length){ box.innerHTML = `<p class="empty-msg" style="padding:18px 12px;">No student matches the current view.</p>`; return; }
   if(names.length>1){
     box.innerHTML = `<div class="matchlist">${names.length} matches: ${names.slice(0,40).map(n=>`<button type="button" onclick="pickStudent(this.dataset.n)" data-n="${escapeAttr(n)}">${escapeHtml(n)}</button>`).join('')}</div>`;
     return;
   }
   showStudent(names[0]);
-});
-window.pickStudent = n => { document.getElementById('stuSearch').value = n; showStudent(n); };
-
+}
+window.pickStudent = n => { stuInput.value = n; showStudent(n); };
 function showStudent(name){
-  const recs = activeRows().filter(r=>r.name===name && r.accom);
+  const recs = filteredRows().filter(r=>r.name===name);
   const box = document.getElementById('stuResult');
-  if(!recs.length){
-    box.innerHTML = `<div class="stu-card"><h3>${escapeHtml(name)}</h3><div class="none">On the roster, no accommodation requests on file.</div></div>`;
-    return;
-  }
+  const term = recs.find(r=>r.term)?.term;
   const pills = recs.map(r=>{
-    const s=r.status.toLowerCase();
-    const cls = s==='approved'?'a':s==='denied'?'d':'p';
-    const tag = r.status||'No decision';
-    return `<span class="pill ${cls}">${escapeHtml(r.accom)} · ${escapeHtml(tag)}</span>`;
+    const cls = r.status.toLowerCase()==='approved'?'a':'d';
+    return `<span class="pill ${cls}">${escapeHtml(r.accom)} &middot; ${escapeHtml(r.status)}</span>`;
   }).join('');
   const a = recs.filter(r=>r.status.toLowerCase()==='approved').length;
   const dn = recs.filter(r=>r.status.toLowerCase()==='denied').length;
-  box.innerHTML = `<div class="stu-card">
-      <h3>${escapeHtml(name)}</h3>
-      <div class="none">${recs.length} request${recs.length>1?'s':''} · ${a} approved · ${dn} denied</div>
-      <div>${pills}</div>
-    </div>`;
+  box.innerHTML = `<div class="stu-card"><h3>${escapeHtml(name)}</h3>
+    <div class="ameta" style="margin-bottom:4px;">${term?escapeHtml(term)+' &middot; ':''}${recs.length} request${recs.length>1?'s':''} &middot; ${a} approved &middot; ${dn} denied</div>
+    <div>${pills}</div></div>`;
 }
 
-/* ---------- export ---------- */
-document.getElementById('csvBtn').addEventListener('click', ()=>{
-  const d = aggregate(activeRows());
-  const rows = [['Accommodation','Total','Approved','Denied','No Decision','Approval %']];
-  d.accom.sort((x,y)=>y.total-x.total).forEach(a=>{
-    const r = a.a+a.d ? Math.round(a.a/(a.a+a.d)*100) : '';
-    rows.push([a.name, a.total, a.a, a.d, a.p, r]);
-  });
-  const csv = rows.map(r=>r.map(c=>{
-    const s=String(c); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
-  }).join(',')).join('\n');
-  const blob = new Blob([csv],{type:'text/csv'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'accommodation-totals.csv';
-  a.click();
-});
+/* ---------- filter description ---------- */
+function describeFilters(){
+  const f = STATE.filters, parts=[];
+  if(f.term!=="__all__") parts.push(f.term);
+  if(f.cls!=="__all__") parts.push(f.cls);
+  if(f.decision!=="__all__") parts.push(f.decision+" only");
+  if(f.accom!=="__all__") parts.push(f.accom);
+  return parts.length ? parts.join("  •  ") : "All records";
+}
 
-/* listeners that re-render the breakdown */
-document.getElementById('accSearch').addEventListener('input', render);
-document.getElementById('sortBy').addEventListener('change', render);
+/* ---------- Word export ---------- */
+function exportWord(){
+  const rows = filteredRows().slice().sort((a,b)=>
+    a.name.localeCompare(b.name) || (a.term||'').localeCompare(b.term||'') || a.accom.localeCompare(b.accom));
+  if(!rows.length){ alert("No records match the current filters."); return; }
+  const d = aggregate(rows);
+  const today = new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+
+  let body='', lastName=null, lastTerm=null;
+  for(const r of rows){
+    const same = r.name===lastName;
+    const nameCell = same ? '' : escapeHtml(r.name);
+    const termCell = (same && r.term===lastTerm) ? '' : escapeHtml(r.term||'—');
+    const color = r.status.toLowerCase()==='approved' ? '#1E7E45' : '#B3243C';
+    const topBorder = same ? '' : 'border-top:1.5px solid #46157D;';
+    body += `<tr>
+      <td style="${topBorder}font-weight:bold;">${nameCell}</td>
+      <td style="${topBorder}">${termCell}</td>
+      <td style="${topBorder}">${escapeHtml(r.accom)}</td>
+      <td style="${topBorder}color:${color};font-weight:bold;">${escapeHtml(r.status)}</td></tr>`;
+    lastName=r.name; lastTerm=r.term;
+  }
+
+  const html =
+`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>OARS Accommodation Report</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<style>
+@page{size:portrait;margin:0.8in;}
+body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1A1424;}
+h1{font-size:18pt;color:#46157D;margin:0 0 2pt;}
+.meta{color:#555;font-size:9.5pt;margin:0 0 2pt;}
+.summary{font-size:10pt;margin:8pt 0 12pt;}
+table{border-collapse:collapse;width:100%;}
+th,td{border:0.5pt solid #C9C2D6;padding:5pt 8pt;text-align:left;vertical-align:top;font-size:10pt;}
+th{background:#46157D;color:#FFFFFF;font-size:9.5pt;text-transform:uppercase;letter-spacing:.4pt;}
+</style></head><body>
+<h1>OARS Accommodation Report</h1>
+<p class="meta">Office of Accessibility Resources &amp; Services &middot; High Point University</p>
+<p class="meta">Generated ${today} &middot; Source: ${escapeHtml(STATE.filename||'Sample data')}</p>
+<p class="meta"><b>Filters:</b> ${escapeHtml(describeFilters())}</p>
+<p class="summary"><b>${d.students.toLocaleString()}</b> students &middot; <b>${d.requests.toLocaleString()}</b> requests &middot; <b style="color:#1E7E45;">${d.approved.toLocaleString()}</b> approved &middot; <b style="color:#B3243C;">${d.denied.toLocaleString()}</b> denied</p>
+<table><thead><tr><th>Student</th><th>Semester</th><th>Requested Accommodation</th><th>Decision</th></tr></thead>
+<tbody>${body}</tbody></table>
+</body></html>`;
+
+  const blob = new Blob(['\ufeff', html], {type:'application/msword'});
+  triggerDownload(blob, `OARS-Accommodation-Report-${stamp()}.doc`);
+}
+
+/* ---------- CSV export ---------- */
+function exportCSV(){
+  const rows = filteredRows().slice().sort((a,b)=>a.name.localeCompare(b.name)||a.accom.localeCompare(b.accom));
+  if(!rows.length){ alert("No records match the current filters."); return; }
+  const out = [['Student','Semester','Requested Accommodation','Decision']];
+  rows.forEach(r=>out.push([r.name, r.term||'', r.accom, r.status]));
+  const csv = out.map(r=>r.map(c=>{const s=String(c); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n');
+  triggerDownload(new Blob(['\ufeff'+csv],{type:'text/csv'}), `OARS-Accommodation-List-${stamp()}.csv`);
+}
 
 /* ---------- helpers ---------- */
+function triggerDownload(blob, filename){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function stamp(){ const d=new Date(); return d.toISOString().slice(0,10); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function escapeAttr(s){ return escapeHtml(s); }
 
-/* ---------- sample data (synthetic, no real students) ---------- */
+document.getElementById('accSearch').addEventListener('input', render);
+document.getElementById('sortBy').addEventListener('change', render);
+
+/* ---------- synthetic sample (no real students) ---------- */
 function loadSample(){
   const accoms = [
-    ["Extra Time 1.50x",50,42,2],["Distraction-Reduced Testing Environment",33,23,1],
-    ["Note-Taking Assistance (Audio Capture Software)",31,16,0],["Reader Assistive Technology",33,3,1],
-    ["Four-Function Calculator",29,7,0],["Foreign Language Substitution",19,17,0],
-    ["Consideration for Computer Use",26,7,0],["Single Room with Suitemates",14,11,0],
-    ["Priority Registration",10,3,0],["Private Bathroom",4,5,0]
+    ["Extra Time 1.50x",50,42],["Distraction-Reduced Testing Environment",33,23],
+    ["Note-Taking Assistance (Audio Capture Software)",31,16],["Reader Assistive Technology",33,3],
+    ["Four-Function Calculator",29,7],["Foreign Language Substitution",19,17],
+    ["Consideration for Computer Use",26,7],["Single Room with Suitemates",14,11],
+    ["Priority Registration",10,3],["Private Bathroom",4,5]
   ];
   const first=["Jordan","Taylor","Casey","Riley","Morgan","Avery","Quinn","Reese","Sage","Drew","Parker","Rowan"];
   const last=["Hale","Brooks","Nash","Vance","Pope","Reyes","Booth","Frost","Webb","Cole","Dunn","Pryor"];
+  const terms=["Fall 2026","Spring 2026"];
   const rows=[]; let n=0;
-  const nextName = () => { n++; return `${first[n%first.length]} ${last[(n*3)%last.length]} ${n}`; };
-  accoms.forEach(([name,ap,dn,pe])=>{
-    for(let i=0;i<ap;i++) rows.push({name:nextName(),cls:"Incoming - Freshman",status:"Approved",accom:name});
-    for(let i=0;i<dn;i++) rows.push({name:nextName(),cls:"Incoming - Freshman",status:"Denied",accom:name});
-    for(let i=0;i<pe;i++) rows.push({name:nextName(),cls:"Incoming - Freshman",status:"",accom:name});
+  const nextName=()=>{n++; return `${first[n%first.length]} ${last[(n*3)%last.length]} ${n}`;};
+  accoms.forEach(([name,ap,dn])=>{
+    for(let i=0;i<ap;i++) rows.push({name:nextName(),cls:"Incoming - Freshman",status:"Approved",accom:name,term:terms[i%2]});
+    for(let i=0;i<dn;i++) rows.push({name:nextName(),cls:"Incoming - Freshman",status:"Denied",accom:name,term:terms[i%2]});
   });
-  for(let i=0;i<1700;i++) rows.push({name:`Roster Student ${i+1}`,cls:"Incoming - Freshman",status:"",accom:""});
-  STATE.rows = rows; STATE.dupes=0; STATE.filename="Sample data (synthetic)";
-  STATE.classLevels=["Incoming - Freshman"]; STATE.activeClass="__all__";
+  STATE.rows=rows; STATE.dupes=0; STATE.skipped=1712; STATE.filename="Sample data (synthetic)";
+  STATE.hasTerm=true;
+  STATE.terms=[...new Set(rows.map(r=>r.term))].sort().reverse();
+  STATE.classLevels=["Incoming - Freshman"];
+  STATE.accoms=[...new Set(rows.map(r=>r.accom))].sort();
+  STATE.filters={ term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" };
   document.getElementById('filename').textContent="Sample data";
   document.getElementById('empty').hidden=true;
   document.getElementById('dash').hidden=false;
-  buildClassFilter(); render();
+  buildFilterBar(); render();
 }
 </script>
 </body>
