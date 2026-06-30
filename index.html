@@ -235,6 +235,7 @@ function ingest(raw){
   if(iName === -1){ alert('Could not find a "Name" column.'); return; }
 
   const seen = new Set(); const rows = []; let dupes=0, skipped=0;
+  const allSeen = new Set(); const allRows = [];   // every student, with/without an accommodation
   for(let i=1;i<raw.length;i++){
     const r = raw[i]; if(!r) continue;
     const name = String(r[iName]??"").trim(); if(!name) continue;
@@ -242,17 +243,20 @@ function ingest(raw){
     const status = iStat>-1 ? String(r[iStat]??"").trim() : "";
     const accom = iAcc>-1 ? String(r[iAcc]??"").trim() : "";
     const term  = iTerm>-1 ? String(r[iTerm]??"").trim() : "";
-    // keep only rows with an accommodation AND a decision
+    // record every student once per name+class+term, regardless of decision
+    const allSig = [name,cls,term].join("||");
+    if(!allSeen.has(allSig)){ allSeen.add(allSig); allRows.push({name, cls, term}); }
+    // keep only rows with an accommodation AND a decision for the analysis
     if(!accom || !status){ skipped++; continue; }
     const sig = [name,status,accom,cls,term].join("||");
     if(seen.has(sig)){ dupes++; continue; }
     seen.add(sig);
     rows.push({name, cls, status, accom, term});
   }
-  STATE.rows = rows; STATE.dupes = dupes; STATE.skipped = skipped;
+  STATE.rows = rows; STATE.allRows = allRows; STATE.dupes = dupes; STATE.skipped = skipped;
   STATE.hasTerm = iTerm>-1;
-  STATE.terms = [...new Set(rows.map(r=>r.term).filter(Boolean))].sort().reverse();
-  STATE.classLevels = [...new Set(rows.map(r=>r.cls).filter(Boolean))].sort();
+  STATE.terms = [...new Set(allRows.map(r=>r.term).filter(Boolean))].sort().reverse();
+  STATE.classLevels = [...new Set(allRows.map(r=>r.cls).filter(Boolean))].sort();
   STATE.accoms = [...new Set(rows.map(r=>r.accom))].sort();
   STATE.filters = { term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" };
   document.getElementById('empty').hidden = true;
@@ -281,6 +285,18 @@ function rowsForOutcomes(){
     (f.cls==="__all__" || r.cls===f.cls) &&
     (f.accom==="__all__" || r.accom===f.accom)
   );
+}
+/* Unique incoming students (any name, with or without an accommodation),
+   respecting only the semester/class filters. Each name counted once. */
+function totalIncoming(){
+  const f = STATE.filters;
+  const names = new Set();
+  for(const r of (STATE.allRows||[])){
+    if(f.term!=="__all__" && r.term!==f.term) continue;
+    if(f.cls!=="__all__" && r.cls!==f.cls) continue;
+    names.add(r.name);
+  }
+  return names.size;
 }
 function studentOutcomes(rows){
   const m = new Map();
@@ -353,17 +369,20 @@ function render(){
   const rows = filteredRows();
   const d = aggregate(rows);
   const oc = studentOutcomes(rowsForOutcomes());
-  renderCards(d, oc);
+  const incoming = totalIncoming();
+  renderCards(d, oc, incoming);
   renderAccom(d);
   refreshStudent();
   renderFootnote(d);
   const sb = document.getElementById('f_accom'); if(sb) sb.value = STATE.filters.accom;
 }
-function renderCards(d, oc){
+function renderCards(d, oc, incoming){
   const rate = d.decided ? Math.round(d.approved/d.decided*100) : 0;
   const ocRate = oc.students ? Math.round(oc.gotApproval/oc.students*100) : 0;
+  const withRate = incoming ? Math.round(oc.students/incoming*100) : 0;
   const cards = [
-    {label:"Students", value:oc.students.toLocaleString(), sub:"in this view", cls:"accent"},
+    {label:"Incoming students", value:incoming.toLocaleString(), sub:"unique \u00b7 all students", cls:"accent"},
+    {label:"With an accommodation", value:oc.students.toLocaleString(), sub:`${withRate}% of incoming`, cls:""},
     {label:"Got \u22651 approval", value:oc.gotApproval.toLocaleString(), sub:`${ocRate}% \u00b7 ${oc.gotNothing.toLocaleString()} got nothing`, cls:"good"},
     {label:"Requests", value:d.requests.toLocaleString(), sub:`${d.accom.length} accommodation types`, cls:""},
     {label:"Approved", value:d.approved.toLocaleString(), sub:`${rate}% of decided`, cls:"good"},
@@ -404,12 +423,13 @@ function renderAccom(d){
   }).join('');
 }
 function renderFootnote(d){
+  const incomingAll = new Set((STATE.allRows||[]).map(r=>r.name)).size;
   document.getElementById('footnote').innerHTML =
-    `<strong>${escapeHtml(STATE.filename||'Sample data')}</strong> &mdash; ${STATE.rows.length.toLocaleString()} accommodation rows`
-    + (STATE.skipped?`, ${STATE.skipped.toLocaleString()} name-only/undecided rows skipped`:``)
+    `<strong>${escapeHtml(STATE.filename||'Sample data')}</strong> &mdash; ${incomingAll.toLocaleString()} unique incoming students in file; `
+    + `${STATE.rows.length.toLocaleString()} accommodation rows`
     + (STATE.dupes?`, ${STATE.dupes} duplicates removed`:``)
-    + `. Only rows with both an accommodation and an Approved/Denied decision are counted. `
-    + `Showing ${d.requests.toLocaleString()} of ${STATE.rows.length.toLocaleString()} after filters. `
+    + `. The breakdown and detail count only rows with both an accommodation and an Approved/Denied decision; the incoming total counts every student once regardless of decision. `
+    + `Showing ${d.requests.toLocaleString()} request rows after filters. `
     + `Processed entirely in your browser &mdash; never uploaded or stored.`;
 }
 
@@ -462,6 +482,7 @@ function exportWord(){
   if(!rows.length){ alert("No records match the current filters."); return; }
   const d = aggregate(rows);
   const oc = studentOutcomes(rowsForOutcomes());
+  const incoming = totalIncoming();
   const today = new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
   const pct = (n,t)=> t ? Math.round(n/t*100)+'%' : '0%';
   const reqRate = d.decided ? Math.round(d.approved/d.decided*100) : 0;
@@ -508,7 +529,8 @@ table.kv td.p{color:#555;width:48pt;}
 <p class="meta"><b>Filters:</b> ${escapeHtml(describeFilters())}</p>
 
 <h2>Student outcomes</h2>
-<table class="kv"><tr><td>Students in this view</td><td class="n">${oc.students.toLocaleString()}</td><td class="p"></td></tr>
+<table class="kv"><tr><td>Incoming students (total, each counted once)</td><td class="n">${incoming.toLocaleString()}</td><td class="p"></td></tr>
+<tr><td>With at least one accommodation request</td><td class="n">${oc.students.toLocaleString()}</td><td class="p">${pct(oc.students,incoming)}</td></tr>
 <tr><td>Got at least one approval</td><td class="n" style="color:#1E7E45;">${oc.gotApproval.toLocaleString()}</td><td class="p">${pct(oc.gotApproval,oc.students)}</td></tr>
 <tr><td style="padding-left:18pt;color:#555;">&mdash; all requests approved</td><td class="n">${oc.fullyApproved.toLocaleString()}</td><td class="p">${pct(oc.fullyApproved,oc.students)}</td></tr>
 <tr><td style="padding-left:18pt;color:#555;">&mdash; some approved, some denied</td><td class="n">${oc.partial.toLocaleString()}</td><td class="p">${pct(oc.partial,oc.students)}</td></tr>
@@ -572,7 +594,10 @@ function loadSample(){
     for(let i=0;i<ap;i++) rows.push({name:nextName(),cls:"Incoming - Freshman",status:"Approved",accom:name,term:terms[i%2]});
     for(let i=0;i<dn;i++) rows.push({name:nextName(),cls:"Incoming - Freshman",status:"Denied",accom:name,term:terms[i%2]});
   });
-  STATE.rows=rows; STATE.dupes=0; STATE.skipped=1712; STATE.filename="Sample data (synthetic)";
+  // roster-only students (no accommodation) to populate the incoming total
+  const allRows = rows.map(r=>({name:r.name, cls:r.cls, term:r.term}));
+  for(let i=0;i<1700;i++) allRows.push({name:`Roster Student ${i+1}`, cls:"Incoming - Freshman", term:terms[i%2]});
+  STATE.rows=rows; STATE.allRows=allRows; STATE.dupes=0; STATE.skipped=1700; STATE.filename="Sample data (synthetic)";
   STATE.hasTerm=true;
   STATE.terms=[...new Set(rows.map(r=>r.term))].sort().reverse();
   STATE.classLevels=["Incoming - Freshman"];
