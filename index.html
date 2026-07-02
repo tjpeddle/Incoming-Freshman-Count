@@ -45,6 +45,14 @@
   .fgroup{display:flex; flex-direction:column; gap:4px;}
   .fgroup label{font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:600;}
   .fgroup select{font-family:"Inter"; font-size:.85rem; padding:8px 11px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); min-width:140px;}
+  .fgroup.fterm{max-width:100%;}
+  .chip-actions{margin-left:8px; font-weight:400; text-transform:none; letter-spacing:0;}
+  .linkbtn{background:none; border:none; color:var(--purple); font:inherit; font-size:.68rem; cursor:pointer; padding:0 3px; text-decoration:underline;}
+  .chips{display:flex; flex-wrap:wrap; gap:6px;}
+  .chip{font-family:"Inter"; font-size:.82rem; font-weight:500; cursor:pointer; border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:20px; padding:7px 13px; transition:.12s; display:inline-flex; align-items:center; gap:6px;}
+  .chip:hover{border-color:var(--purple-bright);}
+  .chip.on{background:var(--purple); color:#fff; border-color:var(--purple);}
+  .chip.on::before{content:"\2713"; font-size:.8em;}
   .filterbar .spacer{flex:1;}
   .filterbar .btn.clear{align-self:flex-end;}
 
@@ -258,7 +266,7 @@ function ingest(raw){
   STATE.terms = [...new Set(allRows.map(r=>r.term).filter(Boolean))].sort().reverse();
   STATE.classLevels = [...new Set(allRows.map(r=>r.cls).filter(Boolean))].sort();
   STATE.accoms = [...new Set(rows.map(r=>r.accom))].sort();
-  STATE.filters = { term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" };
+  STATE.filters = { terms:new Set(STATE.terms), cls:"__all__", decision:"__all__", accom:"__all__" };
   document.getElementById('empty').hidden = true;
   document.getElementById('dash').hidden = false;
   buildFilterBar();
@@ -266,10 +274,19 @@ function ingest(raw){
 }
 
 /* ---------- filtering ---------- */
+/* Semester can be a multi-select. Selecting all (or none) means no narrowing,
+   which keeps the "All" view identical to before. */
+function termMatches(r){
+  if(!STATE.hasTerm) return true;
+  const sel = STATE.filters.terms;
+  if(!sel || sel.size===0 || sel.size===STATE.terms.length) return true;
+  return sel.has(r.term);
+}
+
 function filteredRows(){
   const f = STATE.filters;
   return STATE.rows.filter(r=>
-    (f.term==="__all__" || r.term===f.term) &&
+    termMatches(r) &&
     (f.cls==="__all__" || r.cls===f.cls) &&
     (f.decision==="__all__" || r.status.toLowerCase()===f.decision.toLowerCase()) &&
     (f.accom==="__all__" || r.accom===f.accom)
@@ -281,7 +298,7 @@ function filteredRows(){
 function rowsForOutcomes(){
   const f = STATE.filters;
   return STATE.rows.filter(r=>
-    (f.term==="__all__" || r.term===f.term) &&
+    termMatches(r) &&
     (f.cls==="__all__" || r.cls===f.cls) &&
     (f.accom==="__all__" || r.accom===f.accom)
   );
@@ -292,7 +309,7 @@ function totalIncoming(){
   const f = STATE.filters;
   const names = new Set();
   for(const r of (STATE.allRows||[])){
-    if(f.term!=="__all__" && r.term!==f.term) continue;
+    if(!termMatches(r)) continue;
     if(f.cls!=="__all__" && r.cls!==f.cls) continue;
     names.add(r.name);
   }
@@ -333,8 +350,7 @@ function aggregate(rows){
 function buildFilterBar(){
   const bar = document.getElementById('filterbar');
   const groups = [];
-  if(STATE.hasTerm && STATE.terms.length)
-    groups.push(sel("term","Semester", optList(STATE.terms,"All semesters")));
+  if(STATE.hasTerm && STATE.terms.length) groups.push(termChips());
   if(STATE.classLevels.length>1)
     groups.push(sel("cls","Class level", optList(STATE.classLevels,"All class levels")));
   groups.push(sel("decision","Decision",
@@ -350,12 +366,53 @@ function buildFilterBar(){
     s.value = STATE.filters[s.dataset.f];
     s.addEventListener('change', ()=>{ STATE.filters[s.dataset.f]=s.value; render(); });
   });
+  wireTermChips(bar);
   document.getElementById('clearBtn').onclick = ()=>{
-    STATE.filters={ term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" };
+    STATE.filters={ terms:new Set(STATE.terms), cls:"__all__", decision:"__all__", accom:"__all__" };
     buildFilterBar(); render();
   };
   document.getElementById('wordBtn').onclick = exportWord;
   document.getElementById('csvBtn').onclick = exportCSV;
+}
+
+function termChips(){
+  const sel = STATE.filters.terms || new Set(STATE.terms);
+  const chips = STATE.terms.map(t=>{
+    const on = sel.has(t);
+    return `<button type="button" class="chip${on?' on':''}" role="checkbox" aria-checked="${on}" data-term="${escapeAttr(t)}">${escapeHtml(t)}</button>`;
+  }).join('');
+  return `<div class="fgroup fterm"><label>Semester
+      <span class="chip-actions"><button type="button" class="linkbtn" data-termact="all">All semesters</button></span></label>
+    <div class="chips" id="termChips">${chips}</div></div>`;
+}
+
+function wireTermChips(bar){
+  if(!STATE.hasTerm) return;
+  const cont = bar.querySelector('#termChips'); if(!cont) return;
+  const repaint = ()=> cont.querySelectorAll('.chip').forEach(c=>{
+    const on = STATE.filters.terms.has(c.dataset.term);
+    c.classList.toggle('on', on); c.setAttribute('aria-checked', on);
+  });
+  cont.querySelectorAll('.chip').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const t = b.dataset.term, sel = STATE.filters.terms;
+      if(sel.size===STATE.terms.length){
+        STATE.filters.terms = new Set([t]);          // all lit -> isolate this one
+      } else if(sel.has(t)){
+        sel.delete(t);
+        if(sel.size===0) STATE.filters.terms = new Set(STATE.terms); // never blank
+      } else {
+        sel.add(t);                                   // add to the combination
+      }
+      repaint(); render();
+    });
+  });
+  bar.querySelectorAll('[data-termact]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      STATE.filters.terms = new Set(STATE.terms);
+      repaint(); render();
+    });
+  });
 }
 function sel(key,label,opts){
   return `<div class="fgroup"><label for="f_${key}">${label}</label><select id="f_${key}" data-f="${key}" aria-label="${label}">${opts}</select></div>`;
@@ -468,11 +525,12 @@ function showStudent(name){
 /* ---------- filter description ---------- */
 function describeFilters(){
   const f = STATE.filters, parts=[];
-  if(f.term!=="__all__") parts.push(f.term);
+  if(STATE.hasTerm && f.terms && f.terms.size>0 && f.terms.size<STATE.terms.length)
+    parts.push([...f.terms].sort().reverse().join(" + "));
   if(f.cls!=="__all__") parts.push(f.cls);
   if(f.decision!=="__all__") parts.push(f.decision+" only");
   if(f.accom!=="__all__") parts.push(f.accom);
-  return parts.length ? parts.join("  •  ") : "All records";
+  return parts.length ? parts.join("  \u2022  ") : "All records";
 }
 
 /* ---------- Word export ---------- */
@@ -602,7 +660,7 @@ function loadSample(){
   STATE.terms=[...new Set(rows.map(r=>r.term))].sort().reverse();
   STATE.classLevels=["Incoming - Freshman"];
   STATE.accoms=[...new Set(rows.map(r=>r.accom))].sort();
-  STATE.filters={ term:"__all__", cls:"__all__", decision:"__all__", accom:"__all__" };
+  STATE.filters={ terms:new Set(STATE.terms), cls:"__all__", decision:"__all__", accom:"__all__" };
   document.getElementById('filename').textContent="Sample data";
   document.getElementById('empty').hidden=true;
   document.getElementById('dash').hidden=false;
