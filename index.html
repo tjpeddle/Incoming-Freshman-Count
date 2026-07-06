@@ -510,16 +510,38 @@ window.pickStudent = n => { stuInput.value = n; showStudent(n); };
 function showStudent(name){
   const recs = filteredRows().filter(r=>r.name===name);
   const box = document.getElementById('stuResult');
-  const term = recs.find(r=>r.term)?.term;
-  const pills = recs.map(r=>{
-    const cls = r.status.toLowerCase()==='approved'?'a':'d';
-    return `<span class="pill ${cls}">${escapeHtml(r.accom)} &middot; ${escapeHtml(r.status)}</span>`;
-  }).join('');
+  const terms = [...new Set(recs.filter(r=>r.term).map(r=>r.term))].sort().reverse();
+  const multiTerm = terms.length > 1;
   const a = recs.filter(r=>r.status.toLowerCase()==='approved').length;
   const dn = recs.filter(r=>r.status.toLowerCase()==='denied').length;
+  const termLabel = terms.length ? escapeHtml(terms.join(' + ')) + ' &middot; ' : '';
+
+  let inner;
+  if(multiTerm){
+    // one block per term so the same accommodation across semesters is clear
+    inner = terms.map(t=>{
+      const tr = recs.filter(r=>r.term===t);
+      const ta = tr.filter(r=>r.status.toLowerCase()==='approved').length;
+      const td = tr.filter(r=>r.status.toLowerCase()==='denied').length;
+      const pills = tr.map(r=>{
+        const cls = r.status.toLowerCase()==='approved'?'a':'d';
+        return `<span class="pill ${cls}">${escapeHtml(r.accom)} &middot; ${escapeHtml(r.status)}</span>`;
+      }).join('');
+      return `<div style="margin-top:10px;">
+        <div class="ameta" style="font-weight:600;color:var(--purple);">${escapeHtml(t)} &middot; ${tr.length} request${tr.length>1?'s':''} &middot; ${ta} approved &middot; ${td} denied</div>
+        <div>${pills}</div></div>`;
+    }).join('');
+  } else {
+    const pills = recs.map(r=>{
+      const cls = r.status.toLowerCase()==='approved'?'a':'d';
+      return `<span class="pill ${cls}">${escapeHtml(r.accom)} &middot; ${escapeHtml(r.status)}</span>`;
+    }).join('');
+    inner = `<div>${pills}</div>`;
+  }
+
   box.innerHTML = `<div class="stu-card"><h3>${escapeHtml(name)}</h3>
-    <div class="ameta" style="margin-bottom:4px;">${term?escapeHtml(term)+' &middot; ':''}${recs.length} request${recs.length>1?'s':''} &middot; ${a} approved &middot; ${dn} denied</div>
-    <div>${pills}</div></div>`;
+    <div class="ameta" style="margin-bottom:2px;">${termLabel}${recs.length} request${recs.length>1?'s':''} &middot; ${a} approved &middot; ${dn} denied${multiTerm?' &middot; across '+terms.length+' semesters':''}</div>
+    ${inner}</div>`;
 }
 
 /* ---------- filter description ---------- */
