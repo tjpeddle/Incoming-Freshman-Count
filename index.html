@@ -12,7 +12,7 @@
   :root{
     --bg:#F5F4F8; --surface:#FFFFFF; --ink:#1A1424; --muted:#6B6478; --line:#E6E2EE;
     --purple:#46157D; --purple-bright:#7B3FE4; --purple-soft:#F1ECFA;
-    --approved:#1E9E5A; --denied:#D6435B;
+    --approved:#1E9E5A; --denied:#D6435B; --pending:#E0A340;
     --shadow:0 1px 2px rgba(26,20,36,.04), 0 8px 24px rgba(26,20,36,.05); --radius:14px;
   }
   *{box-sizing:border-box;}
@@ -59,11 +59,19 @@
   .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:0 0 20px;}
   .scopebar{background:var(--purple-soft); border-left:4px solid var(--purple); border-radius:8px; padding:9px 14px; margin:0 0 14px; font-size:.85rem; color:var(--purple); font-weight:600;}
   .scopebar span{font-weight:400; color:var(--muted);}
+  .pendingalert{background:#FFF7E6; border-left:4px solid #C77700; border-radius:8px; padding:11px 14px; margin:0 0 12px; font-size:.87rem; color:#7A4A00; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .pendingalert b{color:#7A4A00;}
+  .pendingalert button{margin-left:auto; font-family:"Inter"; font-weight:600; font-size:.8rem; cursor:pointer; border:1px solid #C77700; background:#fff; color:#7A4A00; border-radius:8px; padding:6px 12px;}
+  .pendingalert button:hover{background:#C77700; color:#fff;}
+  .sw-p{background:var(--pending);}
+  .bar .p{background:var(--pending);}
+  .pill.p{background:#FFF7E6; border-color:#E0B877; color:#7A4A00;}
   .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow);}
   .card .label{font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600;}
   .card .value{font-family:"Space Grotesk"; font-weight:700; font-size:2rem; line-height:1.1; margin-top:6px; letter-spacing:-.02em;}
   .card .sub{font-size:.78rem; color:var(--muted); margin-top:3px;}
   .card.accent .value{color:var(--purple);} .card.good .value{color:var(--approved);} .card.bad .value{color:var(--denied);}
+  .card.warn .value{color:#C77700;}
 
   section.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:20px; overflow:hidden;}
   .panel-head{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:18px 20px 14px;}
@@ -136,6 +144,7 @@
 
     <div class="filterbar" id="filterbar"></div>
 
+    <div class="pendingalert" id="pendingAlert" hidden></div>
     <div class="scopebar" id="scopebar"></div>
 
     <div class="cards" id="cards"></div>
@@ -159,6 +168,7 @@
       <div class="legend" aria-hidden="true">
         <span><i class="swatch sw-a"></i> Approved</span>
         <span><i class="swatch sw-d"></i> Denied</span>
+        <span><i class="swatch sw-p"></i> Pending (no decision)</span>
       </div>
       <div class="rows" id="accRows"></div>
     </section>
@@ -258,14 +268,18 @@ function ingest(raw){
     // record every student once per name+class+term, regardless of decision
     const allSig = [name,cls,term].join("||");
     if(!allSeen.has(allSig)){ allSeen.add(allSig); allRows.push({name, cls, term}); }
-    // keep only rows with an accommodation AND a decision for the analysis
-    if(!accom || !status){ skipped++; continue; }
-    const sig = [name,status,accom,cls,term].join("||");
+    // Keep any row with an accommodation. A blank decision = Pending.
+    // Rows with no accommodation at all are roster-only.
+    if(!accom){ skipped++; continue; }
+    const decision = status || "Pending";
+    const sig = [name,decision,accom,cls,term].join("||");
     if(seen.has(sig)){ dupes++; continue; }
     seen.add(sig);
-    rows.push({name, cls, status, accom, term});
+    rows.push({name, cls, status:decision, accom, term});
   }
   STATE.rows = rows; STATE.allRows = allRows; STATE.dupes = dupes; STATE.skipped = skipped;
+  STATE.pending = rows.filter(r=>r.status==="Pending").length;
+  STATE.pendingStudents = new Set(rows.filter(r=>r.status==="Pending").map(r=>r.name)).size;
   STATE.hasTerm = iTerm>-1;
   STATE.terms = [...new Set(allRows.map(r=>r.term).filter(Boolean))].sort().reverse();
   STATE.classLevels = [...new Set(allRows.map(r=>r.cls).filter(Boolean))].sort();
@@ -322,32 +336,37 @@ function totalIncoming(){
 function studentOutcomes(rows){
   const m = new Map();
   for(const r of rows){
-    const sm = m.get(r.name) || {a:0,d:0};
+    const sm = m.get(r.name) || {a:0,d:0,p:0};
     const s = r.status.toLowerCase();
-    if(s==='approved') sm.a++; else if(s==='denied') sm.d++;
+    if(s==='approved') sm.a++; else if(s==='denied') sm.d++; else sm.p++;
     m.set(r.name, sm);
   }
-  let fa=0, pa=0, fd=0;
+  let fa=0, pa=0, fd=0, waiting=0;
   for(const [,sm] of m){
     if(sm.a>0 && sm.d===0) fa++;
     else if(sm.a>0 && sm.d>0) pa++;
-    else fd++;
+    else if(sm.d>0) fd++;
+    else fd++;                                  // only-pending students: nothing approved yet
+    if(sm.p>0) waiting++;                       // has at least one undecided request
   }
-  return { students:m.size, gotApproval:fa+pa, gotNothing:fd, fullyApproved:fa, partial:pa, fullyDenied:fd };
+  return { students:m.size, gotApproval:fa+pa, gotNothing:fd, fullyApproved:fa, partial:pa, fullyDenied:fd, waiting };
 }
 
 function aggregate(rows){
   const students=new Set(), accom=new Map();
-  let approved=0, denied=0;
+  let approved=0, denied=0, pending=0;
   for(const r of rows){
     students.add(r.name);
-    const e = accom.get(r.accom) || {a:0,d:0,total:0};
+    const e = accom.get(r.accom) || {a:0,d:0,p:0,total:0};
     const s = r.status.toLowerCase();
-    if(s==='approved'){ e.a++; approved++; } else if(s==='denied'){ e.d++; denied++; }
+    if(s==='approved'){ e.a++; approved++; }
+    else if(s==='denied'){ e.d++; denied++; }
+    else { e.p++; pending++; }
     e.total++; accom.set(r.accom, e);
   }
-  return { students:students.size, requests:rows.length, approved, denied,
-    decided:approved+denied, accom:[...accom.entries()].map(([name,v])=>({name,...v})) };
+  return { students:students.size, requests:rows.length, approved, denied, pending,
+    decided:approved+denied,   // approval rates use decided only
+    accom:[...accom.entries()].map(([name,v])=>({name,...v})) };
 }
 
 /* ---------- filter bar ---------- */
@@ -358,7 +377,7 @@ function buildFilterBar(){
   if(STATE.classLevels.length>1)
     groups.push(sel("cls","Class level", optList(STATE.classLevels,"All class levels")));
   groups.push(sel("decision","Decision",
-    `<option value="__all__">Approved &amp; denied</option><option value="Approved">Approved only</option><option value="Denied">Denied only</option>`));
+    `<option value="__all">All decisions</option><option value="Approved">Approved only</option><option value="Denied">Denied only</option><option value="Pending">Pending only</option>`.replace('__all','__all__')));
   groups.push(sel("accom","Accommodation", optList(STATE.accoms,"All accommodations")));
   bar.innerHTML = groups.join('') +
     `<span class="spacer"></span>` +
@@ -435,6 +454,7 @@ function render(){
   renderAccom(d);
   refreshStudent();
   renderFootnote(d);
+  renderPendingAlert();
   const scopeEl = document.getElementById('scopebar');
   if(scopeEl) scopeEl.innerHTML = `Showing: ${escapeHtml(describeScope())} <span>&mdash; every number below and in exports covers exactly this scope</span>`;
   const sb = document.getElementById('f_accom'); if(sb) sb.value = STATE.filters.accom;
@@ -450,6 +470,7 @@ function renderCards(d, oc, incoming){
     {label:"Requests", value:d.requests.toLocaleString(), sub:`${d.accom.length} accommodation types`, cls:""},
     {label:"Approved", value:d.approved.toLocaleString(), sub:`${rate}% of decided`, cls:"good"},
     {label:"Denied", value:d.denied.toLocaleString(), sub:`${100-rate}% of decided`, cls:"bad"},
+    {label:"Pending", value:d.pending.toLocaleString(), sub:d.pending?"awaiting decision":"none outstanding", cls:"warn"},
   ];
   document.getElementById('cards').innerHTML = cards.map(c=>`
     <div class="card ${c.cls}"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join('');
@@ -475,23 +496,42 @@ function renderAccom(d){
     const seg = t => a.total ? (t/a.total*100) : 0;
     const r = a.a+a.d ? Math.round(a.a/(a.a+a.d)*100) : null;
     const meta = [`${a.a} approved`, `${a.d} denied`];
+    if(a.p) meta.push(`${a.p} pending`);
     if(r!==null) meta.push(`${r}% approval`);
     return `<div class="arow"><div>
         <div class="aname">${escapeHtml(a.name)}</div>
         <div class="ameta">${meta.join(' &middot; ')}</div>
-        <div class="bar" style="width:${Math.max(w,6)}%" role="img" aria-label="${a.a} approved, ${a.d} denied">
-          <i class="a" style="width:${seg(a.a)}%"></i><i class="d" style="width:${seg(a.d)}%"></i>
+        <div class="bar" style="width:${Math.max(w,6)}%" role="img" aria-label="${a.a} approved, ${a.d} denied${a.p?', '+a.p+' pending':''}">
+          <i class="a" style="width:${seg(a.a)}%"></i><i class="d" style="width:${seg(a.d)}%"></i><i class="p" style="width:${seg(a.p)}%"></i>
         </div></div>
       <div class="acount">${a.total}<small>requests</small></div></div>`;
   }).join('');
 }
+function renderPendingAlert(){
+  const el = document.getElementById('pendingAlert'); if(!el) return;
+  // pending within the current semester/class scope (ignore the decision filter)
+  const scoped = rowsForOutcomes().filter(r=>r.status==="Pending");
+  const n = scoped.length;
+  const stu = new Set(scoped.map(r=>r.name)).size;
+  if(!n){ el.hidden = true; return; }
+  el.hidden = false;
+  const showing = STATE.filters.decision==="Pending";
+  el.innerHTML = `<span>&#9888;</span><div><b>${n} pending request${n>1?'s':''} across ${stu} student${stu>1?'s':''}</b> &mdash; no decision recorded. Not counted in approval rates.</div>`
+    + `<button type="button" id="pendBtn">${showing?'Show all decisions':'Review pending'}</button>`;
+  document.getElementById('pendBtn').onclick = ()=>{
+    STATE.filters.decision = showing ? "__all__" : "Pending";
+    const s=document.getElementById('f_decision'); if(s) s.value = STATE.filters.decision;
+    render();
+  };
+}
+
 function renderFootnote(d){
   const incomingAll = new Set((STATE.allRows||[]).map(r=>r.name)).size;
   document.getElementById('footnote').innerHTML =
     `<strong>${escapeHtml(STATE.filename||'Sample data')}</strong> &mdash; ${incomingAll.toLocaleString()} unique incoming students in file; `
     + `${STATE.rows.length.toLocaleString()} accommodation rows`
     + (STATE.dupes?`, ${STATE.dupes} duplicates removed`:``)
-    + `. The breakdown and detail count only rows with both an accommodation and an Approved/Denied decision; the incoming total counts every student once regardless of decision. `
+    + `. Requests include Approved, Denied, and Pending (blank decision). Approval rates use decided requests only. `
     + `Showing ${d.requests.toLocaleString()} request rows after filters. `
     + `Processed entirely in your browser &mdash; never uploaded or stored.`;
 }
@@ -530,7 +570,8 @@ function showStudent(name){
       const ta = tr.filter(r=>r.status.toLowerCase()==='approved').length;
       const td = tr.filter(r=>r.status.toLowerCase()==='denied').length;
       const pills = tr.map(r=>{
-        const cls = r.status.toLowerCase()==='approved'?'a':'d';
+        const st = r.status.toLowerCase();
+        const cls = st==='approved'?'a':st==='denied'?'d':'p';
         return `<span class="pill ${cls}">${escapeHtml(r.accom)} &middot; ${escapeHtml(r.status)}</span>`;
       }).join('');
       return `<div style="margin-top:10px;">
@@ -539,7 +580,8 @@ function showStudent(name){
     }).join('');
   } else {
     const pills = recs.map(r=>{
-      const cls = r.status.toLowerCase()==='approved'?'a':'d';
+      const st = r.status.toLowerCase();
+      const cls = st==='approved'?'a':st==='denied'?'d':'p';
       return `<span class="pill ${cls}">${escapeHtml(r.accom)} &middot; ${escapeHtml(r.status)}</span>`;
     }).join('');
     inner = `<div>${pills}</div>`;
@@ -602,7 +644,8 @@ function exportWord(){
   const acc = d.accom.slice().sort((x,y)=>y.total-x.total || x.name.localeCompare(y.name));
   let breakdown = acc.map(a=>{
     const r = a.a+a.d ? Math.round(a.a/(a.a+a.d)*100)+'%' : '\u2014';
-    return `<tr><td>${escapeHtml(a.name)}</td><td style="text-align:center;">${a.total}</td><td style="text-align:center;color:#1E7E45;">${a.a}</td><td style="text-align:center;color:#B3243C;">${a.d}</td><td style="text-align:center;">${r}</td></tr>`;
+    const pcell = a.p ? `<td style="text-align:center;color:#C77700;">${a.p}</td>` : `<td style="text-align:center;color:#999;">\u2014</td>`;
+    return `<tr><td>${escapeHtml(a.name)}</td><td style="text-align:center;">${a.total}</td><td style="text-align:center;color:#1E7E45;">${a.a}</td><td style="text-align:center;color:#B3243C;">${a.d}</td>${pcell}<td style="text-align:center;">${r}</td></tr>`;
   }).join('');
 
   const html =
@@ -637,19 +680,21 @@ ${stamp1}
 <tr><td>Got at least one approval</td><td class="n" style="color:#1E7E45;">${oc.gotApproval.toLocaleString()}</td><td class="p">${pct(oc.gotApproval,oc.students)}</td></tr>
 <tr><td style="padding-left:18pt;color:#555;">&mdash; all requests approved</td><td class="n">${oc.fullyApproved.toLocaleString()}</td><td class="p">${pct(oc.fullyApproved,oc.students)}</td></tr>
 <tr><td style="padding-left:18pt;color:#555;">&mdash; some approved, some denied</td><td class="n">${oc.partial.toLocaleString()}</td><td class="p">${pct(oc.partial,oc.students)}</td></tr>
-<tr><td>Got nothing approved (all denied)</td><td class="n" style="color:#B3243C;">${oc.gotNothing.toLocaleString()}</td><td class="p">${pct(oc.gotNothing,oc.students)}</td></tr></table>
+<tr><td>Got nothing approved</td><td class="n" style="color:#B3243C;">${oc.gotNothing.toLocaleString()}</td><td class="p">${pct(oc.gotNothing,oc.students)}</td></tr>
+<tr><td>Awaiting a decision on \u22651 request</td><td class="n" style="color:#C77700;">${oc.waiting.toLocaleString()}</td><td class="p">${pct(oc.waiting,oc.students)}</td></tr></table>
 <p class="meta" style="margin-top:4pt;">Outcomes count each student once (a student with several requests is one person), across every decision in this scope.</p>
 
 <h2>Request totals</h2>
 ${stamp1}
 <table class="kv"><tr><td>Total requests</td><td class="n">${d.requests.toLocaleString()}</td><td class="p"></td></tr>
 <tr><td>Approved</td><td class="n" style="color:#1E7E45;">${d.approved.toLocaleString()}</td><td class="p">${pct(d.approved,d.decided)}</td></tr>
-<tr><td>Denied</td><td class="n" style="color:#B3243C;">${d.denied.toLocaleString()}</td><td class="p">${100-reqRate}%</td></tr></table>
-<p class="meta" style="margin-top:4pt;">Each request is one Approved/Denied decision. A student who renews an accommodation across semesters is counted once per semester here.</p>
+<tr><td>Denied</td><td class="n" style="color:#B3243C;">${d.denied.toLocaleString()}</td><td class="p">${100-reqRate}%</td></tr>
+<tr><td>Pending (no decision recorded)</td><td class="n" style="color:#C77700;">${d.pending.toLocaleString()}</td><td class="p"></td></tr></table>
+<p class="meta" style="margin-top:4pt;">Approval percentages use decided requests only (approved + denied); pending requests are excluded from those rates. Each request is one decision. A student who renews an accommodation across semesters is counted once per semester here.</p>
 
 <h2>Accommodation breakdown</h2>
 ${stamp1}
-<table><thead><tr><th>Requested Accommodation</th><th style="text-align:center;">Total</th><th style="text-align:center;">Approved</th><th style="text-align:center;">Denied</th><th style="text-align:center;">Approval&nbsp;%</th></tr></thead>
+<table><thead><tr><th>Requested Accommodation</th><th style="text-align:center;">Total</th><th style="text-align:center;">Approved</th><th style="text-align:center;">Denied</th><th style="text-align:center;">Pending</th><th style="text-align:center;">Approval&nbsp;%</th></tr></thead>
 <tbody>${breakdown}</tbody></table>
 
 <h2>Student detail</h2>
